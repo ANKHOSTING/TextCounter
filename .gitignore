@@ -1,0 +1,88 @@
+# ============================================================
+# Base44 + GitHub — Sensitive File Protection
+# ============================================================
+# This .gitignore ensures API keys, Stripe secrets, database
+# credentials, and other sensitive files are NEVER pushed to
+# your GitHub repository.
+# ============================================================
+
+# ---- Environment & Secrets ----
+.env
+.env.local
+.env.*.local
+.env.production
+.env.staging
+.env.development
+*.env
+!.env.example
+
+# ---- API Keys & Tokens ----
+*.pem
+*.key
+*.p12
+*.pfx
+secret*.json
+service-account*.json
+firebase-service-account*.json
+
+# ---- Stripe / Payment Credentials ----
+stripe*.key
+stripe*.json
+payment-config.json
+
+# ---- Database & Backend Credentials ----
+database-url.txt
+db-credentials.json
+*.db.local
+mongo-uri.txt
+
+# ---- OAuth / Auth Secrets ----
+oauth-secrets.json
+jwt-secret.txt
+auth-keys/
+
+# ---- Base44 Local Config ----
+.base44-cache/
+base44-secrets.json
+
+# ---- Node.js ----
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm/
+.yarn/
+.pnpm-store/
+
+# ---- Build Artifacts ----
+dist/
+build/
+out/
+.next/
+.nuxt/
+.cache/
+.parcel-cache/
+.turbo/
+
+# ---- IDE & Editor ----
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ---- Logs ----
+logs/
+*.log
+
+# ---- Testing & Coverage ----
+coverage/
+.nyc_output/
+test-results/
+
+# ---- Misc ----
+.tmp/
+tmp/
+*.local
