@@ -25,10 +25,10 @@ The `writing-check` function calls an OpenAI-compatible `/chat/completions` endp
    npx supabase secrets set AI_API_KEY=fw_...  FREE_DAILY_LIMIT=3
    # optional overrides:
    #   AI_BASE_URL=https://api.fireworks.ai/inference/v1   (default)
-   #   AI_MODEL=glm-flash-latest                           (default)
+   #   AI_MODEL=accounts/fireworks/models/nemotron-lightning-3p5-30b-a3b   (default)
    #   REVENUECAT_SECRET_KEY=sk_...  REVENUECAT_ENTITLEMENT=pro
    ```
-   **Model:** the default `glm-flash-latest` is a Fireworks serverless alias (currently GLM-5.3 Flash) listed at https://docs.fireworks.ai/nexus/open-models as of Sep 27, 2026. Aliases can move or be retired, so if checks start failing, list current models with
+   **Model:** the default `accounts/fireworks/models/nemotron-lightning-3p5-30b-a3b` (Nemotron Lightning) was tested working on Fireworks in Oct 2026; it reasons before answering, so keep max_tokens >= ~1500 (the function uses 2500). Models can be retired, so if checks start failing, list current models with
    `curl https://api.fireworks.ai/v1/serverless/models -H "Authorization: Bearer $AI_API_KEY"` and set `AI_MODEL` (e.g. `deepseek-flash-latest`, or a full id like `accounts/fireworks/models/<name>`).
    **To use OpenAI instead:** `AI_API_KEY=sk-... AI_BASE_URL=https://api.openai.com/v1 AI_MODEL=gpt-4o-mini`.
 4. Deploy: `npx supabase functions deploy writing-check --no-verify-jwt` (no user accounts, so no JWT).

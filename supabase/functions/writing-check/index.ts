@@ -35,9 +35,9 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
   const apiKey = Deno.env.get("AI_API_KEY");
-  // Default: Fireworks serverless. Model alias from https://docs.fireworks.ai/nexus/open-models (Sep 2026 snapshot).
+  // Default: Fireworks serverless. Default model tested working Oct 2026 (reasons first, needs max_tokens >= ~1500).
   const baseUrl = (Deno.env.get("AI_BASE_URL") ?? "https://api.fireworks.ai/inference/v1").replace(/\/+$/, "");
-  const model = Deno.env.get("AI_MODEL") ?? "glm-flash-latest";
+  const model = Deno.env.get("AI_MODEL") ?? "accounts/fireworks/models/nemotron-lightning-3p5-30b-a3b";
   if (!apiKey) return json({ error: "not_configured" }, 503);
   try {
     const { text, deviceId, rcUserId } = await req.json() as { text?: string; deviceId?: string; rcUserId?: string | null };
