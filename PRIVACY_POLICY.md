@@ -11,7 +11,7 @@ The app has no sign-up or login. We do not collect your name, email, or contacts
 Everything you type or paste, and every draft you save, is processed and stored **only on your device**. Word counts, keyword density, readability and other statistics are calculated offline. Uninstalling the app or deleting a draft removes it.
 
 ## AI writing check (optional)
-Only when you tap **AI writing check**, the text in the editor (up to 6,000 characters) is sent over an encrypted connection to our server (hosted on Supabase) and forwarded to OpenAI to generate corrections. We do **not** store your text. OpenAI processes it under its API data policy (API data is not used to train models by default). To enforce the free daily limit, the server stores a random, app-generated device identifier and a daily count; it is not linked to your identity.
+Only when you tap **AI writing check**, the text in the editor (up to 6,000 characters) is sent over an encrypted connection to our server (hosted on Supabase) and forwarded to our AI model provider (Fireworks AI) to generate corrections. We do **not** store your text. The provider processes it under its API data policy (see https://fireworks.ai/privacy-policy). To enforce the free daily limit, the server stores a random, app-generated device identifier and a daily count; it is not linked to your identity.
 
 ## Purchases
 TextCraft Pro subscriptions are handled by Google Play Billing and RevenueCat. RevenueCat receives an anonymous app user ID and purchase records to confirm your subscription. We never see your payment details. See https://www.revenuecat.com/privacy.

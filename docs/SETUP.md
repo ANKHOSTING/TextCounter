@@ -14,18 +14,28 @@ The app runs with **zero configuration**: all counting, analysis and drafts work
 - `android.versionCode` is set to **10** so it exceeds earlier uploads. If Play says "version code already used", raise it in `app.json` (e.g. 11, 20) and rebuild. Bump it on every upload.
 - If Play rejects the AAB for a **signing key mismatch**, the earlier upload was signed with a different key. In Play Console → App integrity, either let EAS use the existing upload key (`eas credentials` → upload your keystore) or request an upload-key reset.
 
-## 2. AI writing check (Supabase + OpenAI)
+## 2. AI writing check (Supabase + Fireworks AI, or any OpenAI-compatible provider)
+The `writing-check` function calls an OpenAI-compatible `/chat/completions` endpoint. Defaults to **Fireworks AI**.
+
 1. Use the existing Supabase project (or create one) at https://supabase.com.
 2. Apply the migration: `npx supabase link --project-ref <ref>` then `npx supabase db push` (or paste `supabase/migrations/*.sql` into the SQL editor).
-3. Set secrets:
+3. Set secrets (server-side only, never in the app or `.env`):
    ```bash
-   npx supabase secrets set OPENAI_API_KEY=sk-...  FREE_DAILY_LIMIT=3
-   # optional: AI_MODEL=gpt-4o-mini  REVENUECAT_SECRET_KEY=sk_...  REVENUECAT_ENTITLEMENT=pro
+   # Fireworks (default). Key from https://fireworks.ai/account/api-keys
+   npx supabase secrets set AI_API_KEY=fw_...  FREE_DAILY_LIMIT=3
+   # optional overrides:
+   #   AI_BASE_URL=https://api.fireworks.ai/inference/v1   (default)
+   #   AI_MODEL=glm-flash-latest                           (default)
+   #   REVENUECAT_SECRET_KEY=sk_...  REVENUECAT_ENTITLEMENT=pro
    ```
+   **Model:** the default `glm-flash-latest` is a Fireworks serverless alias (currently GLM-5.3 Flash) listed at https://docs.fireworks.ai/nexus/open-models as of Sep 27, 2026. Aliases can move or be retired, so if checks start failing, list current models with
+   `curl https://api.fireworks.ai/v1/serverless/models -H "Authorization: Bearer $AI_API_KEY"` and set `AI_MODEL` (e.g. `deepseek-flash-latest`, or a full id like `accounts/fireworks/models/<name>`).
+   **To use OpenAI instead:** `AI_API_KEY=sk-... AI_BASE_URL=https://api.openai.com/v1 AI_MODEL=gpt-4o-mini`.
 4. Deploy: `npx supabase functions deploy writing-check --no-verify-jwt` (no user accounts, so no JWT).
 5. Put `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_ANON_KEY` (Project Settings → API) in `.env` / EAS env.
+6. Test: `curl -X POST "$SUPABASE_URL/functions/v1/writing-check" -H "apikey: $ANON" -H "Authorization: Bearer $ANON" -H "Content-Type: application/json" -d '{"text":"Their going too the store.","deviceId":"test-device-123"}'`
 
-If these are missing, the app shows "AI writing check isn't set up" and everything else works. If the OpenAI key is missing on the server, the function returns 503 and the app shows the same message.
+If these are missing, the app shows "AI writing check isn't set up" and everything else works. If `AI_API_KEY` is missing on the server, the function returns 503 and the app shows the same message.
 
 The free limit is enforced server-side per random device ID. A determined user could reset it by reinstalling; that's an accepted trade-off for an account-free app.
 

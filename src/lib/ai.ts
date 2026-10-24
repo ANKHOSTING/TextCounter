@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Crypto from 'expo-crypto';
 import { getAppUserId } from './purchases';
 
-/** Optional AI writing check. Calls the `writing-check` Supabase Edge Function; the OpenAI key lives only on the server. */
+/** Optional AI writing check. Calls the `writing-check` Supabase Edge Function; the AI provider key lives only on the server. */
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
 const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
 export const MAX_AI_CHARS = 6000;

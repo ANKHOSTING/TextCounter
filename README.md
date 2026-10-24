@@ -15,7 +15,7 @@ Works fully **offline, no account**:
 - Paste / copy / clear, and saved drafts stored on the device (AsyncStorage)
 
 Optional online:
-- **AI writing check** (spelling, grammar, punctuation, suggestions, corrected text) via the `writing-check` Supabase Edge Function. The OpenAI key lives only on the server. Free users get a daily limit (default 3/day). If the AI isn't configured, the app says so and everything else keeps working.
+- **AI writing check** (spelling, grammar, punctuation, suggestions, corrected text) via the `writing-check` Supabase Edge Function. The AI key (Fireworks by default; any OpenAI-compatible provider) lives only on the server. Free users get a daily limit (default 3/day). If the AI isn't configured, the app says so and everything else keeps working.
 - **TextCraft Pro** (RevenueCat / Google Play Billing): unlimited AI checks and no ads.
 - Banner ads (AdMob) for free users; Google test ads until real IDs are set.
 
@@ -31,4 +31,4 @@ See [docs/SETUP.md](docs/SETUP.md), [docs/PLAY_STORE_LISTING.md](docs/PLAY_STORE
 
 ## Security
 - `.gitignore` prevents API keys, service-account JSON, and `.env` files from being committed.
-- Never put the OpenAI key or RevenueCat secret key in the app. Only `EXPO_PUBLIC_*` values (public by design) go in `.env`.
+- Never put the AI API key or RevenueCat secret key in the app. Only `EXPO_PUBLIC_*` values (public by design) go in `.env`.

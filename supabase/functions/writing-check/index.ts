@@ -1,6 +1,7 @@
 // Supabase Edge Function: AI writing check (spelling, grammar, punctuation, suggestions).
 // Deploy with: supabase functions deploy writing-check --no-verify-jwt   (the app has no user accounts)
-// Secrets (supabase secrets set ...): OPENAI_API_KEY (required), optional AI_MODEL, FREE_DAILY_LIMIT,
+// Provider-agnostic: any OpenAI-compatible /chat/completions API (Fireworks by default, OpenAI via AI_BASE_URL).
+// Secrets (supabase secrets set ...): AI_API_KEY (required), optional AI_BASE_URL, AI_MODEL, FREE_DAILY_LIMIT,
 //   REVENUECAT_SECRET_KEY (v1 secret key, to verify TextCraft Pro server-side), REVENUECAT_ENTITLEMENT (default "pro").
 // SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are injected automatically. User text is never stored.
 import { createClient } from "npm:@supabase/supabase-js@2";
@@ -33,7 +34,10 @@ Keep the same language as the input. If there are no issues, return an empty iss
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
-  const apiKey = Deno.env.get("OPENAI_API_KEY");
+  const apiKey = Deno.env.get("AI_API_KEY");
+  // Default: Fireworks serverless. Model alias from https://docs.fireworks.ai/nexus/open-models (Sep 2026 snapshot).
+  const baseUrl = (Deno.env.get("AI_BASE_URL") ?? "https://api.fireworks.ai/inference/v1").replace(/\/+$/, "");
+  const model = Deno.env.get("AI_MODEL") ?? "glm-flash-latest";
   if (!apiKey) return json({ error: "not_configured" }, 503);
   try {
     const { text, deviceId, rcUserId } = await req.json() as { text?: string; deviceId?: string; rcUserId?: string | null };
@@ -51,21 +55,24 @@ Deno.serve(async (req) => {
       if (used >= limit) return json({ error: "limit_reached", limit, used }, 429);
     }
 
-    const resp = await fetch("https://api.openai.com/v1/chat/completions", {
+    const resp = await fetch(`${baseUrl}/chat/completions`, {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: Deno.env.get("AI_MODEL") ?? "gpt-4o-mini",
+        model,
         response_format: { type: "json_object" },
         max_tokens: 2500,
         temperature: 0.2,
         messages: [{ role: "system", content: SYSTEM }, { role: "user", content: text.slice(0, 6000) }],
       }),
     });
-    if (!resp.ok) return json({ error: "AI provider error" }, 502);
+    if (!resp.ok) { console.error("AI provider", resp.status, await resp.text()); return json({ error: "AI provider error" }, 502); }
     const data = await resp.json();
     let parsed: any = {};
-    try { parsed = JSON.parse(data.choices?.[0]?.message?.content ?? "{}"); } catch { /* fallthrough */ }
+    const raw: string = data.choices?.[0]?.message?.content ?? "{}";
+    // Some models wrap JSON in prose/code fences or a <think> block; take the outermost {...}.
+    const m = raw.replace(/<think>[\s\S]*?<\/think>/g, "").match(/\{[\s\S]*\}/);
+    try { parsed = JSON.parse(m ? m[0] : raw); } catch { return json({ error: "AI returned an unreadable response, please try again" }, 502); }
 
     if (!pro) used = (await admin.rpc("increment_ai_usage", { p_device: deviceId })).data ?? used + 1;
     return json({
