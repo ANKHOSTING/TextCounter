@@ -86,3 +86,13 @@ test-results/
 .tmp/
 tmp/
 *.local
+
+# ---- Expo ----
+node_modules/
+.expo/
+dist/
+android/
+ios/
+web-build/
+expo-env.d.ts
+play-service-account.json

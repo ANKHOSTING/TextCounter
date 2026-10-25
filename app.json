@@ -1,0 +1,40 @@
+{
+  "expo": {
+    "name": "TextCraft: Word Counter",
+    "slug": "textcraft-word-counter",
+    "scheme": "textcraft",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "ios": { "bundleIdentifier": "com.textcounter.app", "supportsTablet": true },
+    "android": {
+      "package": "com.textcounter.app",
+      "versionCode": 10,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "monochromeImage": "./assets/monochrome-icon.png",
+        "backgroundColor": "#4F46E5"
+      },
+      "permissions": ["com.android.vending.BILLING"]
+    },
+    "web": { "favicon": "./assets/favicon.png" },
+    "plugins": [
+      "expo-router",
+      "expo-status-bar",
+      ["expo-build-properties", {}],
+      ["react-native-google-mobile-ads", {
+        "androidAppId": "ca-app-pub-3940256099942544~3347511713",
+        "iosAppId": "ca-app-pub-3940256099942544~1458002511"
+      }],
+      ["expo-splash-screen", {
+        "image": "./assets/splash-icon.png",
+        "imageWidth": 200,
+        "resizeMode": "contain",
+        "backgroundColor": "#EEF2FF"
+      }]
+    ],
+    "experiments": { "typedRoutes": true },
+    "extra": { "eas": { "projectId": "REPLACE_WITH_EAS_PROJECT_ID" } }
+  }
+}
