@@ -1,7 +1,7 @@
 {
   "cli": { "version": ">= 16.0.0", "appVersionSource": "local" },
   "build": {
-    "development": { "developmentClient": true, "distribution": "internal" },
+    "development": { "developmentClient": true, "distribution": "internal", "env": { "ADMOB_ALLOW_TEST_IDS": "true" } },
     "preview": { "distribution": "internal", "android": { "buildType": "apk" } },
     "production": { "android": { "buildType": "app-bundle" } }
   },

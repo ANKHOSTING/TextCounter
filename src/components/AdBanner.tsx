@@ -7,7 +7,7 @@ import { usePro } from '@/lib/pro';
 /** Banner ad for free users only. Hidden for TextCraft Pro subscribers. */
 export function AdBanner() {
   const { pro } = usePro();
-  if (!ADS_ENABLED || pro) return null;
+  if (!ADS_ENABLED || !BANNER_UNIT_ID || pro) return null;
   return (
     <View style={{ alignItems: 'center' }}>
       <BannerAd unitId={BANNER_UNIT_ID} size={BannerAdSize.ANCHORED_ADAPTIVE_BANNER}

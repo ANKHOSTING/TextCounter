@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, ScrollView, Text, TextInput, View } from 'react-native';
+import { Alert, KeyboardAvoidingView, ScrollView, Text, TextInput, View } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { useRouter } from 'expo-router';
 import { analyze, formatDuration } from '@/lib/textStats';
@@ -19,7 +19,7 @@ export default function Write() {
   const save = async () => { if (!text.trim()) return; const d = await saveDraft(text, draftId); setDraftId(d.id); Alert.alert('Draft saved', 'Saved on this device.'); };
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.bg }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.bg }} behavior="padding">
       <ScrollView contentContainerStyle={{ padding: 14 }} keyboardShouldPersistTaps="handled">
         <Card style={{ flexDirection: 'row', flexWrap: 'wrap', paddingVertical: 6 }}>
           <Stat label="Words" value={st.words} />

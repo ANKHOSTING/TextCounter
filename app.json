@@ -24,15 +24,15 @@
       "expo-status-bar",
       ["expo-build-properties", {}],
       ["react-native-google-mobile-ads", {
-        "androidAppId": "ca-app-pub-3940256099942544~3347511713",
-        "iosAppId": "ca-app-pub-3940256099942544~1458002511"
+        "androidAppId": "REPLACE_WITH_ADMOB_ANDROID_APP_ID"
       }],
       ["expo-splash-screen", {
         "image": "./assets/splash-icon.png",
         "imageWidth": 200,
         "resizeMode": "contain",
         "backgroundColor": "#EEF2FF"
-      }]
+      }],
+      "./plugins/with-no-test-admob.js"
     ],
     "experiments": { "typedRoutes": true },
     "extra": { "eas": { "projectId": "REPLACE_WITH_EAS_PROJECT_ID" } }
