@@ -7,6 +7,8 @@ const { withAppBuildGradle } = require('@expo/config-plugins');
 const MARK = '// @with-no-test-admob';
 
 module.exports = function withNoTestAdmob(config) {
+  // Explicit test-id opt-in (EAS development/preview or local; app.config.js rejects it for production): skip the check.
+  if ((process.env.ADMOB_ALLOW_TEST_IDS || '').trim() === 'true') return config;
   return withAppBuildGradle(config, (cfg) => {
     let g = cfg.modResults.contents;
     if (g.includes(MARK)) return cfg;

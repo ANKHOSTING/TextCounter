@@ -1,3 +1,4 @@
+import { createContext } from 'react';
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import { TestIds } from 'react-native-google-mobile-ads';
@@ -21,3 +22,6 @@ export const BANNER_UNIT_ID: string | null = __DEV__ ? TestIds.ADAPTIVE_BANNER :
 
 export const ADS_ENABLED =
   process.env.EXPO_PUBLIC_ADS_ENABLED !== 'false' && Platform.OS !== 'web' && !!BANNER_UNIT_ID;
+
+/** True once UMP consent allows ad requests (or the consent request failed: banners are always non-personalized). */
+export const AdsReadyContext = createContext(false);
