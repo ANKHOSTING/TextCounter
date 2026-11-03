@@ -23,5 +23,5 @@ export const BANNER_UNIT_ID: string | null = __DEV__ ? TestIds.ADAPTIVE_BANNER :
 export const ADS_ENABLED =
   process.env.EXPO_PUBLIC_ADS_ENABLED !== 'false' && Platform.OS !== 'web' && !!BANNER_UNIT_ID;
 
-/** True once UMP consent allows ad requests (or the consent request failed: banners are always non-personalized). */
+/** True once UMP consent allows ad requests (banners are always non-personalized). Set by the root layout. */
 export const AdsReadyContext = createContext(false);

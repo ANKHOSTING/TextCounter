@@ -5,7 +5,7 @@ do $$
 begin
   create extension if not exists pg_cron;
   perform cron.schedule('ai-usage-cleanup', '23 3 * * *',
-    $job$delete from ai_usage where day < current_date - 1$job$);
+    $job$delete from public.ai_usage where day < (now() at time zone 'utc')::date - 1$job$);
 exception when others then
-  raise notice 'pg_cron not available (%); schedule: delete from ai_usage where day < current_date - 1;', sqlerrm;
+  raise notice 'pg_cron not available (%); schedule: delete from public.ai_usage where day < (now() at time zone ''utc'')::date - 1;', sqlerrm;
 end $$;

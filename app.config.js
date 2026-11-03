@@ -7,8 +7,8 @@
 // set ADMOB_ALLOW_TEST_IDS=true (done in the EAS "development" and "preview" profiles; locally e.g. in .env.local).
 // The opt-in is honoured only for EAS_BUILD_PROFILE=development|preview or a local non-EAS run (EAS_BUILD unset) and is
 // rejected for production/any other profile. The JS side shows test ads only under __DEV__ (see src/lib/ads.ts), so preview
-// builds show no ads. With the opt-in the Gradle release check (plugins/with-no-test-admob.js) is skipped; without it, release
-// builds whose merged manifest has the Google test app id fail. Production and EAS Update need the REAL ids as EAS environment variables.
+// builds show no ads. The Gradle release check (plugins/with-no-test-admob.js) is skipped only when EAS_BUILD_PROFILE is
+// development/preview; every other release build (incl. local) fails if the merged manifest has the Google test app id. Production and EAS Update need the REAL ids as EAS environment variables.
 const GOOGLE_TEST_PUBLISHER = 'ca-app-pub-3940256099942544';
 const GOOGLE_TEST_ANDROID_APP_ID = `${GOOGLE_TEST_PUBLISHER}~3347511713`;
 const APP_ID_RE = /^ca-app-pub-\d{16}~\d{10}$/;
