@@ -16,7 +16,7 @@ const json = (body: unknown, status = 200) =>
 
 async function isProUser(rcUserId: string | null | undefined): Promise<boolean> {
   const key = Deno.env.get("REVENUECAT_SECRET_KEY");
-  if (!key || !rcUserId) return false;
+  if (!key || !rcUserId || rcUserId.length > 128) return false; // rcUserId is client-supplied: only trusted via the RevenueCat lookup below
   try {
     const r = await fetch(`https://api.revenuecat.com/v1/subscribers/${encodeURIComponent(rcUserId)}`, {
       headers: { Authorization: `Bearer ${key}` },
@@ -89,11 +89,13 @@ Deno.serve(async (req) => {
     const pro = await isProUser(rcUserId);
     const limit = Number(Deno.env.get("FREE_DAILY_LIMIT") ?? "3");
     let used = 0;
+    // Atomic reserve BEFORE the AI call (no read-then-write race). Refunded if the AI call fails.
+    const refund = async () => { if (!pro) await admin.rpc("refund_ai_usage", { p_device: deviceId }).then(() => {}, () => {}); };
     if (!pro) {
-      const today = new Date().toISOString().slice(0, 10);
-      const { data: u } = await admin.from("ai_usage").select("count").eq("device_id", deviceId).eq("day", today).maybeSingle();
-      used = u?.count ?? 0;
-      if (used >= limit) return json({ error: "limit_reached", limit, used }, 429);
+      const { data: n, error: incErr } = await admin.rpc("increment_ai_usage", { p_device: deviceId });
+      if (incErr || typeof n !== "number") { console.error("usage increment failed", incErr?.message); return json({ error: "Something went wrong. Please try again." }, 500); }
+      used = n;
+      if (used > limit) { await refund(); return json({ error: "limit_reached", limit, used: limit }, 429); }
     }
 
     const resp = await fetch(`${baseUrl}/chat/completions`, {
@@ -107,15 +109,14 @@ Deno.serve(async (req) => {
         messages: [{ role: "system", content: SYSTEM }, { role: "user", content: text.slice(0, 6000) }],
       }),
     });
-    if (!resp.ok) { console.error("AI provider", resp.status, await resp.text()); return json({ error: "AI provider error" }, 502); }
+    if (!resp.ok) { console.error("AI provider", resp.status, await resp.text()); await refund(); return json({ error: "AI provider error" }, 502); }
     const data = await resp.json();
     let parsed: any = {};
     const raw: string = data.choices?.[0]?.message?.content ?? "{}";
     // Some models wrap JSON in prose/code fences or a <think> block; take the outermost {...}.
     const m = raw.replace(/<think>[\s\S]*?<\/think>/g, "").match(/\{[\s\S]*\}/);
-    try { parsed = JSON.parse(m ? m[0] : raw); } catch { return json({ error: "AI returned an unreadable response, please try again" }, 502); }
+    try { parsed = JSON.parse(m ? m[0] : raw); } catch { await refund(); return json({ error: "AI returned an unreadable response, please try again" }, 502); }
 
-    if (!pro) used = (await admin.rpc("increment_ai_usage", { p_device: deviceId })).data ?? used + 1;
     return json({
       issues: Array.isArray(parsed.issues) ? parsed.issues.slice(0, 50) : [],
       suggestions: Array.isArray(parsed.suggestions) ? parsed.suggestions.slice(0, 5) : [],
@@ -123,6 +124,7 @@ Deno.serve(async (req) => {
       pro, used: pro ? null : used, limit: pro ? null : limit,
     });
   } catch (e) {
-    return json({ error: String(e) }, 500);
+    console.error("writing-check failed", e);
+    return json({ error: "Something went wrong. Please try again." }, 500);
   }
 });

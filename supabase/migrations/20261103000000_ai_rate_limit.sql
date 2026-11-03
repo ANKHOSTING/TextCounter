@@ -29,3 +29,10 @@ begin
   return 'ok';
 end $$;
 revoke all on function public.consume_ai_quota(text, int, int) from public, anon, authenticated;
+
+-- Gives back one unit of the per-device free quota (used when the AI call fails after the atomic reserve).
+create or replace function public.refund_ai_usage(p_device text)
+returns void language sql security definer set search_path = public as $$
+  update ai_usage set count = greatest(count - 1, 0) where device_id = p_device and day = (now() at time zone 'utc')::date;
+$$;
+revoke all on function public.refund_ai_usage(text) from public, anon, authenticated;
