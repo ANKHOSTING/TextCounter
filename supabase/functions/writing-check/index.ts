@@ -132,7 +132,7 @@ Deno.serve(async (req) => {
     if (!/^[\w-]{8,64}$/.test(deviceId)) return json({ error: "Missing device id" }, 400);
 
     const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-    const ipSecret = Deno.env.get("IP_HASH_SECRET") ?? "";
+    const ipSecret = (Deno.env.get("IP_HASH_SECRET") ?? "").trim(); // trimmed so stray whitespace/newline from `secrets set` neither counts toward length nor changes the HMAC key
     if (ipSecret.length < 32) { console.error("IP_HASH_SECRET is unset or shorter than 32 chars; refusing requests (fail closed)"); return json({ error: "service_unavailable" }, 503); }
     const ip = clientIp(req);
     if (!ip) {
