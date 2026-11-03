@@ -1,17 +1,16 @@
 import React, { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import mobileAds from 'react-native-google-mobile-ads';
 import { ProProvider } from '@/lib/pro';
 import { EditorProvider } from '@/lib/editor';
 import { initPurchases } from '@/lib/purchases';
-import { ADS_ENABLED } from '@/lib/ads';
+import { initMobileAds } from '@/lib/mobileAds';
 import { colors } from '@/components/ui';
 
 initPurchases();
 
 export default function RootLayout() {
-  useEffect(() => { if (ADS_ENABLED) mobileAds().initialize().catch(() => {}); }, []);
+  useEffect(() => { initMobileAds(); }, []);
   return (
     <ProProvider>
       <EditorProvider>

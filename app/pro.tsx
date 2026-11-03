@@ -1,8 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, Text } from 'react-native';
 import { useRouter } from 'expo-router';
-import type { PurchasesPackage } from 'react-native-purchases';
-import { buyPackage, getProPackages, purchasesAvailable, restorePurchases } from '@/lib/purchases';
+import { buyPackage, getProPackages, purchasesAvailable, restorePurchases, type PurchasesPackage } from '@/lib/purchases';
 import { usePro } from '@/lib/pro';
 import { Button, Card, s } from '@/components/ui';
 

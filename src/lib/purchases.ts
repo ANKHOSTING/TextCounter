@@ -1,6 +1,8 @@
 import { Platform } from 'react-native';
 import Purchases, { type PurchasesPackage } from 'react-native-purchases';
 
+export type { PurchasesPackage };
+
 /** RevenueCat entitlement identifier configured in the RevenueCat dashboard. */
 export const PRO_ENTITLEMENT = 'pro';
 const ANDROID_KEY = process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_KEY ?? '';

@@ -1,7 +1,8 @@
 import React, { useCallback, useState } from 'react';
-import { Alert, FlatList, Pressable, Text, View } from 'react-native';
+import { FlatList, Pressable, Text, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { deleteDraft, listDrafts, type Draft } from '@/lib/drafts';
+import { confirmAction } from '@/lib/confirm';
 import { analyze } from '@/lib/textStats';
 import { useEditor } from '@/lib/editor';
 import { Card, colors, s } from '@/components/ui';
@@ -14,10 +15,7 @@ export default function Drafts() {
   useFocusEffect(load);
 
   const open = (d: Draft) => { setText(d.text); setDraftId(d.id); router.navigate('/'); };
-  const remove = (d: Draft) => Alert.alert('Delete draft?', d.title, [
-    { text: 'Cancel', style: 'cancel' },
-    { text: 'Delete', style: 'destructive', onPress: async () => { await deleteDraft(d.id); load(); } },
-  ]);
+  const remove = (d: Draft) => confirmAction('Delete draft?', d.title, 'Delete', async () => { await deleteDraft(d.id); load(); });
 
   return (
     <FlatList

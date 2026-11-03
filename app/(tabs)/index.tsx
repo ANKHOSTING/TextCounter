@@ -3,6 +3,7 @@ import { Alert, KeyboardAvoidingView, ScrollView, Text, TextInput, View } from '
 import * as Clipboard from 'expo-clipboard';
 import { useRouter } from 'expo-router';
 import { analyze, formatDuration } from '@/lib/textStats';
+import { confirmAction } from '@/lib/confirm';
 import { saveDraft } from '@/lib/drafts';
 import { useEditor } from '@/lib/editor';
 import { AdBanner } from '@/components/AdBanner';
@@ -15,7 +16,7 @@ export default function Write() {
 
   const paste = async () => { const t = await Clipboard.getStringAsync(); if (t) setText(text ? `${text}${text.endsWith('\n') ? '' : '\n'}${t}` : t); };
   const copy = async () => { await Clipboard.setStringAsync(text); Alert.alert('Copied to clipboard'); };
-  const clear = () => { if (!text) return; Alert.alert('Clear text?', 'Unsaved changes will be lost.', [{ text: 'Cancel', style: 'cancel' }, { text: 'Clear', style: 'destructive', onPress: () => { setText(''); setDraftId(null); } }]); };
+  const clear = () => { if (!text) return; confirmAction('Clear text?', 'Unsaved changes will be lost.', 'Clear', () => { setText(''); setDraftId(null); }); };
   const save = async () => { if (!text.trim()) return; const d = await saveDraft(text, draftId); setDraftId(d.id); Alert.alert('Draft saved', 'Saved on this device.'); };
 
   return (
