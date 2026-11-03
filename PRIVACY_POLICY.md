@@ -19,7 +19,7 @@ To enforce the free daily limit and prevent abuse, our server stores only pseudo
 TextCraft Pro subscriptions are handled by Google Play Billing and RevenueCat. RevenueCat receives an anonymous app user ID and purchase records to confirm your subscription. We never see your payment details. See https://www.revenuecat.com/privacy.
 
 ## Advertising
-Free users see banner ads from Google AdMob. In the European Economic Area and the United Kingdom, a Google consent form (Google's User Messaging Platform) is shown before ads are requested, and ads are not requested until consent is handled. We request non-personalized ads, but AdMob may collect device identifiers (such as the advertising ID), IP address, and ad-interaction data to serve ads, measure performance and prevent fraud, and AdMob may also collect diagnostic data (such as crash logs and performance data) to keep its SDK working. See https://policies.google.com/technologies/ads. TextCraft Pro removes ads.
+Free users see banner ads from Google AdMob. Where required (for example in the European Economic Area and the United Kingdom), a Google consent form (Google's User Messaging Platform) is shown before ads are requested, and ads are not requested until consent is handled. We request non-personalized ads, but AdMob may collect device identifiers (such as the advertising ID), IP address, and ad-interaction data to serve ads, measure performance and prevent fraud, and AdMob may also collect diagnostic data (such as crash logs and performance data) to keep its SDK working. See https://policies.google.com/technologies/ads. TextCraft Pro removes ads.
 
 ## Children
 The app is not directed at children under 13.

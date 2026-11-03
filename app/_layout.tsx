@@ -16,7 +16,7 @@ export default function RootLayout() {
     if (!ADS_ENABLED) return;
     let cancelled = false;
     (async () => {
-      if (await isPro()) return; // Pro users never see ads: no consent form, no SDK init
+      if (await isPro().catch(() => false)) return; // Pro users never see ads: no consent form, no SDK init
       // UMP consent first (shows the consent form where required). Default is "no ad requests"; if the request fails we
       // only proceed when the last known consent info already allows ads. Banners are always non-personalized (AdBanner).
       let canRequestAds = false;
