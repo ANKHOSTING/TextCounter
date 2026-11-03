@@ -1,5 +1,5 @@
 -- Per-IP and global daily request caps for the writing-check Edge Function.
--- Keys are SHA-256 hashes of the caller IP (never the raw IP); old rows are pruned by a daily schedule (below),
+-- Keys are HMAC-SHA256 hashes of the caller IP keyed with IP_HASH_SECRET (never the raw IP); old rows are pruned by a daily schedule (below),
 -- not per call. No text is stored.
 create table if not exists public.ai_rate_limit (
   key text not null,
