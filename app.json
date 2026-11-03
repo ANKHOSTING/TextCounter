@@ -31,7 +31,8 @@
         "imageWidth": 200,
         "resizeMode": "contain",
         "backgroundColor": "#EEF2FF"
-      }]
+      }],
+      "./plugins/with-no-test-admob.js"
     ],
     "experiments": { "typedRoutes": true },
     "extra": { "eas": { "projectId": "REPLACE_WITH_EAS_PROJECT_ID" } }

@@ -1,7 +1,7 @@
 // Supabase Edge Function: AI writing check (spelling, grammar, punctuation, suggestions).
 // Deploy with: supabase functions deploy writing-check   (verify_jwt stays ON: the Supabase gateway rejects requests without a valid
 // anon/user JWT; the app has no user accounts so it sends the anon key).
-// Required secret: IP_HASH_SECRET (random, >= 32 chars) keys the IP hashes; unset => 503. Optional: TRUSTED_PROXY_HOPS (default 1), see docs/SETUP.md.
+// Required secret: IP_HASH_SECRET (random, >= 32 chars) keys the IP hashes; unset/short => 503. IPv6 is keyed on its /64. Optional: TRUSTED_PROXY_HOPS (default 1), see docs/SETUP.md.
 // Abuse protection: per-IP daily cap (IP_DAILY_LIMIT, default 30) + global daily cap (GLOBAL_DAILY_LIMIT, default 2000) + per-device free limit.
 // Provider-agnostic: any OpenAI-compatible /chat/completions API (Fireworks by default, OpenAI via AI_BASE_URL).
 // Secrets (supabase secrets set ...): AI_API_KEY (required), optional AI_BASE_URL, AI_MODEL, FREE_DAILY_LIMIT,
@@ -51,6 +51,35 @@ function validIp(v: string | null | undefined): string | null {
   const t = (v ?? "").trim();
   if (IPV4_RE.test(t)) return t;
   return isIpv6(t) ? t.toLowerCase() : null;
+}
+
+/** Expands a VALID IPv6 string to its 8 numeric 16-bit groups. */
+function ipv6Groups(v: string): number[] {
+  let t = v.toLowerCase();
+  const m = t.match(/^(.*:)(\d+\.\d+\.\d+\.\d+)$/); // embedded IPv4 tail -> two hex groups
+  if (m) {
+    const o = m[2].split(".").map(Number);
+    t = m[1] + ((o[0] << 8) | o[1]).toString(16) + ":" + ((o[2] << 8) | o[3]).toString(16);
+  }
+  const [head, tail] = t.split("::");
+  const h = head ? head.split(":") : [];
+  const l = tail === undefined ? [] : tail ? tail.split(":") : [];
+  const mid = tail === undefined ? [] : Array(8 - h.length - l.length).fill("0");
+  return [...h, ...mid, ...l].map((g) => parseInt(g, 16));
+}
+
+/**
+ * Rate-limit identity for a validated IP: IPv4 as-is (IPv4-mapped IPv6 is mapped back to IPv4); IPv6 is expanded to
+ * its full form and reduced to the /64 prefix, because one subscriber commonly controls a whole /64 and could
+ * otherwise rotate addresses to dodge the per-IP cap.
+ */
+function rateLimitIdentity(ip: string): string {
+  if (IPV4_RE.test(ip)) return ip;
+  const g = ipv6Groups(ip);
+  if (g.slice(0, 5).every((x) => x === 0) && g[5] === 0xffff) {
+    return `${g[6] >> 8}.${g[6] & 255}.${g[7] >> 8}.${g[7] & 255}`;
+  }
+  return "v6/64:" + g.slice(0, 4).map((x) => x.toString(16).padStart(4, "0")).join(":");
 }
 
 /**
@@ -103,8 +132,8 @@ Deno.serve(async (req) => {
     if (!/^[\w-]{8,64}$/.test(deviceId)) return json({ error: "Missing device id" }, 400);
 
     const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-    const ipSecret = Deno.env.get("IP_HASH_SECRET");
-    if (!ipSecret) { console.error("IP_HASH_SECRET is not set; refusing requests (fail closed)"); return json({ error: "service_unavailable" }, 503); }
+    const ipSecret = Deno.env.get("IP_HASH_SECRET") ?? "";
+    if (ipSecret.length < 32) { console.error("IP_HASH_SECRET is unset or shorter than 32 chars; refusing requests (fail closed)"); return json({ error: "service_unavailable" }, 503); }
     const ip = clientIp(req);
     if (!ip) {
       console.error("no valid client IP in cf-connecting-ip / x-forwarded-for; check TRUSTED_PROXY_HOPS", {
@@ -112,7 +141,7 @@ Deno.serve(async (req) => {
       });
       return json({ error: "service_unavailable" }, 503);
     }
-    const ipKey = (await hmacIpKey(ip, ipSecret)).slice(0, 32);
+    const ipKey = (await hmacIpKey(rateLimitIdentity(ip), ipSecret)).slice(0, 32);
     giveBack = async () => {
       const dev = deviceReserved, quota = quotaConsumed;
       deviceReserved = quotaConsumed = false; // idempotent
