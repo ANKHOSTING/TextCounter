@@ -24,8 +24,8 @@
       "expo-status-bar",
       ["expo-build-properties", {}],
       ["react-native-google-mobile-ads", {
-        "androidAppId": "ca-app-pub-3940256099942544~3347511713",
-        "iosAppId": "ca-app-pub-3940256099942544~1458002511"
+        "androidAppId": "REPLACE_WITH_ADMOB_ANDROID_APP_ID",
+        "iosAppId": "REPLACE_WITH_ADMOB_IOS_APP_ID"
       }],
       ["expo-splash-screen", {
         "image": "./assets/splash-icon.png",

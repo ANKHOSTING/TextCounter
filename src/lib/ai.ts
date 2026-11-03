@@ -33,7 +33,10 @@ export async function runWritingCheck(text: string): Promise<CheckResult> {
       body: JSON.stringify({ text: text.slice(0, MAX_AI_CHARS), deviceId: await deviceId(), rcUserId: await getAppUserId() }),
     });
     const body: any = await res.json().catch(() => ({}));
-    if (res.status === 429 || body?.error === 'limit_reached') {
+    if (body?.error === 'rate_limited' || body?.error === 'service_busy') {
+      return { ok: false, reason: 'error', message: body.error === 'rate_limited' ? 'Too many requests from your network today. Please try again tomorrow.' : 'The AI check is very busy right now. Please try again later.' };
+    }
+    if (body?.error === 'limit_reached') {
       return { ok: false, reason: 'limit', message: `You've used your ${body?.limit ?? 'free'} free AI checks today. Upgrade to TextCraft Pro for unlimited checks.` };
     }
     if (res.status === 503 || body?.error === 'not_configured') {
