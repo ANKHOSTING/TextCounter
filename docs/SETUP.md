@@ -31,7 +31,7 @@ The `writing-check` function calls an OpenAI-compatible `/chat/completions` endp
    **Model:** the default `accounts/fireworks/models/nemotron-lightning-3p5-30b-a3b` (Nemotron Lightning) was tested working on Fireworks in Oct 2026; it reasons before answering, so keep max_tokens >= ~1500 (the function uses 2500). Models can be retired, so if checks start failing, list current models with
    `curl https://api.fireworks.ai/v1/serverless/models -H "Authorization: Bearer $AI_API_KEY"` and set `AI_MODEL` (e.g. `deepseek-flash-latest`, or a full id like `accounts/fireworks/models/<name>`).
    **To use OpenAI instead:** `AI_API_KEY=sk-... AI_BASE_URL=https://api.openai.com/v1 AI_MODEL=gpt-4o-mini`.
-4. Deploy: `npx supabase functions deploy writing-check` (JWT verification stays ON: the app sends the Supabase anon JWT). Optional secrets: `IP_DAILY_LIMIT` (default 30 requests/IP/day), `GLOBAL_DAILY_LIMIT` (default 2000 requests/day across all users). Apply the `consume_ai_quota` migration first.
+4. Deploy: `npx supabase functions deploy writing-check` (JWT verification stays ON: the app sends the Supabase anon JWT). Optional secrets: `IP_DAILY_LIMIT` (default 30 requests/IP/day), `GLOBAL_DAILY_LIMIT` (default 2000 requests/day across all users). Apply the `consume_ai_quota` migration first. The migration schedules a daily cleanup of `ai_rate_limit` with `pg_cron` if available; otherwise run `delete from public.ai_rate_limit where day < current_date - 1;` daily from any scheduler (the table is tiny, so skipping it is harmless short-term). Set `TRUSTED_PROXY_HOPS` (default 1) only if you put another proxy in front of Supabase.
 5. Put `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_ANON_KEY` (Project Settings → API) in `.env` / EAS env.
 6. Test: `curl -X POST "$SUPABASE_URL/functions/v1/writing-check" -H "apikey: $ANON" -H "Authorization: Bearer $ANON" -H "Content-Type: application/json" -d '{"text":"Their going too the store.","deviceId":"test-device-123"}'`
 
@@ -48,7 +48,7 @@ The free limit is enforced server-side per random device ID. A determined user c
 
 ## 4. Ads (AdMob)
 1. Create an AdMob app for `com.textcounter.app` and a banner ad unit.
-2. Set `ADMOB_ANDROID_APP_ID` (`ca-app-pub-XXXX~YYYY`) as an env / EAS environment variable; `app.config.js` injects it into the AdMob plugin. The EAS **production** profile fails if it is missing.
+2. Set `ADMOB_ANDROID_APP_ID` (`ca-app-pub-XXXX~YYYY`) as an env / EAS environment variable; `app.config.js` injects it into the AdMob plugin. Config resolution (any EAS profile or local build) fails if it is missing; there is no test-id fallback. For local dev only, set `ADMOB_ALLOW_TEST_IDS=true` (already set in the EAS `development` profile).
 3. Set `EXPO_PUBLIC_ADMOB_BANNER_ANDROID` (`ca-app-pub-XXXX/ZZZZ`) to your banner unit ID. If empty, release builds show **no** ad; Google test ads are used only in `__DEV__`.
 4. Add `app-ads.txt` on your developer website if you list one in Play.
 5. Set `EXPO_PUBLIC_ADS_ENABLED=false` to ship without ads.

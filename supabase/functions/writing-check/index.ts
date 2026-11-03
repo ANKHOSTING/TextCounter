@@ -1,6 +1,7 @@
 // Supabase Edge Function: AI writing check (spelling, grammar, punctuation, suggestions).
-// Deploy with: supabase functions deploy writing-check   (JWT verification ON; the app has no user accounts, so it sends the Supabase anon JWT)
-// Abuse protection: JWT required + per-IP daily cap (IP_DAILY_LIMIT, default 30) + global daily cap (GLOBAL_DAILY_LIMIT, default 2000) + per-device free limit.
+// Deploy with: supabase functions deploy writing-check   (verify_jwt stays ON: the Supabase gateway rejects requests without a valid
+// anon/user JWT; the app has no user accounts so it sends the anon key).
+// Abuse protection: per-IP daily cap (IP_DAILY_LIMIT, default 30) + global daily cap (GLOBAL_DAILY_LIMIT, default 2000) + per-device free limit.
 // Provider-agnostic: any OpenAI-compatible /chat/completions API (Fireworks by default, OpenAI via AI_BASE_URL).
 // Secrets (supabase secrets set ...): AI_API_KEY (required), optional AI_BASE_URL, AI_MODEL, FREE_DAILY_LIMIT,
 //   REVENUECAT_SECRET_KEY (v1 secret key, to verify TextCraft Pro server-side), REVENUECAT_ENTITLEMENT (default "pro").
@@ -27,22 +28,18 @@ async function isProUser(rcUserId: string | null | undefined): Promise<boolean> 
   } catch { return false; }
 }
 
-function hasSupabaseJwt(req: Request): boolean {
-  // Signature is verified by the Supabase gateway (verify_jwt ON). This is defence in depth in case the function
-  // is ever deployed with --no-verify-jwt: require a bearer token shaped like a Supabase anon/authenticated JWT.
-  const m = (req.headers.get("Authorization") ?? "").match(/^Bearer ([\w-]+)\.([\w-]+)\.([\w-]+)$/);
-  if (!m) return false;
-  try {
-    const b64 = m[2].replace(/-/g, "+").replace(/_/g, "/");
-    const claims = JSON.parse(atob(b64.padEnd(Math.ceil(b64.length / 4) * 4, "=")));
-    if (claims.exp && claims.exp * 1000 < Date.now()) return false;
-    return claims.role === "anon" || claims.role === "authenticated";
-  } catch { return false; }
-}
-
-function clientIp(req: Request): string {
-  const xff = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
-  return req.headers.get("cf-connecting-ip") || xff || req.headers.get("x-real-ip") || "unknown";
+/**
+ * Caller IP from headers set by Supabase's proxy. Prefers cf-connecting-ip (set by the CDN, not client-controllable);
+ * otherwise the last *trusted* x-forwarded-for hop: entries before it can be spoofed by the client, so we take
+ * the entry TRUSTED_PROXY_HOPS from the right (default 1 = the address the edge proxy itself appended).
+ * Returns null when no IP can be determined (the request is then rejected; there is no shared "unknown" bucket).
+ */
+function clientIp(req: Request): string | null {
+  const cf = req.headers.get("cf-connecting-ip")?.trim();
+  if (cf) return cf;
+  const hops = (req.headers.get("x-forwarded-for") ?? "").split(",").map((x) => x.trim()).filter(Boolean);
+  const n = Math.max(1, Number(Deno.env.get("TRUSTED_PROXY_HOPS") ?? "1") || 1);
+  return hops.length >= n ? hops[hops.length - n] : null;
 }
 
 async function sha256Hex(v: string): Promise<string> {
@@ -63,7 +60,9 @@ Deno.serve(async (req) => {
   const baseUrl = (Deno.env.get("AI_BASE_URL") ?? "https://api.fireworks.ai/inference/v1").replace(/\/+$/, "");
   const model = Deno.env.get("AI_MODEL") ?? "accounts/fireworks/models/nemotron-lightning-3p5-30b-a3b";
   if (!apiKey) return json({ error: "not_configured" }, 503);
-  if (!hasSupabaseJwt(req)) return json({ error: "unauthorized" }, 401);
+  // Reservations to give back if anything after them fails (also invoked from the outer catch).
+  let deviceReserved = false, quotaConsumed = false;
+  let giveBack: () => Promise<void> = async () => {};
   try {
     let body: { text?: unknown; deviceId?: unknown; rcUserId?: unknown };
     try { body = await req.json(); } catch { return json({ error: "Invalid JSON" }, 400); }
@@ -74,32 +73,45 @@ Deno.serve(async (req) => {
     if (!/^[\w-]{8,64}$/.test(deviceId)) return json({ error: "Missing device id" }, 400);
 
     const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+    const ip = clientIp(req);
+    if (!ip) return json({ error: "Could not determine client address" }, 400);
+    const ipKey = (await sha256Hex(ip)).slice(0, 32);
+    giveBack = async () => {
+      const dev = deviceReserved, quota = quotaConsumed;
+      deviceReserved = quotaConsumed = false; // idempotent
+      if (dev) await admin.rpc("refund_ai_usage", { p_device: deviceId }).then(() => {}, () => {});
+      if (quota) await admin.rpc("refund_ai_quota", { p_ip_key: ipKey }).then(() => {}, () => {});
+    };
 
-    // Per-IP + global daily caps (apply to everyone, including Pro). Fails closed if the quota check errors.
-    const ipLimit = Number(Deno.env.get("IP_DAILY_LIMIT") ?? "30");
-    const globalLimit = Number(Deno.env.get("GLOBAL_DAILY_LIMIT") ?? "2000");
-    const ipKey = (await sha256Hex(clientIp(req))).slice(0, 32);
-    const { data: quota, error: quotaErr } = await admin.rpc("consume_ai_quota", {
-      p_ip_key: ipKey, p_ip_limit: ipLimit, p_global_limit: globalLimit,
-    });
-    if (quotaErr) { console.error("quota check failed", quotaErr.message); return json({ error: "service_unavailable" }, 500); }
-    if (quota === "ip_limit") return json({ error: "rate_limited" }, 429);
-    if (quota === "global_limit") return json({ error: "service_busy" }, 429);
-
+    // 1) Pro status + per-device free limit first (atomic reserve), so requests already over the free limit
+    //    never consume IP/global quota.
     const pro = await isProUser(rcUserId);
     const limit = Number(Deno.env.get("FREE_DAILY_LIMIT") ?? "3");
     let used = 0;
-    // Atomic reserve BEFORE the AI call (no read-then-write race). Refunded if the AI call fails.
-    const refund = async () => { if (!pro) await admin.rpc("refund_ai_usage", { p_device: deviceId }).then(() => {}, () => {}); };
     if (!pro) {
       const { data: n, error: incErr } = await admin.rpc("increment_ai_usage", { p_device: deviceId });
       if (incErr || typeof n !== "number") { console.error("usage increment failed", incErr?.message); return json({ error: "Something went wrong. Please try again." }, 500); }
+      deviceReserved = true;
       used = n;
-      if (used > limit) { await refund(); return json({ error: "limit_reached", limit, used: limit }, 429); }
+      if (used > limit) { await giveBack(); return json({ error: "limit_reached", limit, used: limit }, 429); }
     }
+
+    // 2) Per-IP + global daily caps (apply to everyone, including Pro). Fails closed if the quota check errors.
+    const ipLimit = Number(Deno.env.get("IP_DAILY_LIMIT") ?? "30");
+    const globalLimit = Number(Deno.env.get("GLOBAL_DAILY_LIMIT") ?? "2000");
+    const { data: quota, error: quotaErr } = await admin.rpc("consume_ai_quota", {
+      p_ip_key: ipKey, p_ip_limit: ipLimit, p_global_limit: globalLimit,
+    });
+    if (quotaErr) { console.error("quota check failed", quotaErr.message); await giveBack(); return json({ error: "service_unavailable" }, 500); }
+    if (quota !== "ok") {
+      await giveBack(); // device unit is returned; the over-limit IP/global count is intentionally kept (throttle)
+      return json({ error: quota === "ip_limit" ? "rate_limited" : "service_busy" }, 429);
+    }
+    quotaConsumed = true;
 
     const resp = await fetch(`${baseUrl}/chat/completions`, {
       method: "POST",
+      signal: AbortSignal.timeout(Number(Deno.env.get("AI_TIMEOUT_MS") ?? "25000")),
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
         model,
@@ -109,14 +121,15 @@ Deno.serve(async (req) => {
         messages: [{ role: "system", content: SYSTEM }, { role: "user", content: text.slice(0, 6000) }],
       }),
     });
-    if (!resp.ok) { console.error("AI provider", resp.status, await resp.text()); await refund(); return json({ error: "AI provider error" }, 502); }
+    if (!resp.ok) { console.error("AI provider", resp.status, await resp.text()); await giveBack(); return json({ error: "AI provider error" }, 502); }
     const data = await resp.json();
     let parsed: any = {};
     const raw: string = data.choices?.[0]?.message?.content ?? "{}";
     // Some models wrap JSON in prose/code fences or a <think> block; take the outermost {...}.
     const m = raw.replace(/<think>[\s\S]*?<\/think>/g, "").match(/\{[\s\S]*\}/);
-    try { parsed = JSON.parse(m ? m[0] : raw); } catch { await refund(); return json({ error: "AI returned an unreadable response, please try again" }, 502); }
+    try { parsed = JSON.parse(m ? m[0] : raw); } catch { await giveBack(); return json({ error: "AI returned an unreadable response, please try again" }, 502); }
 
+    deviceReserved = quotaConsumed = false; // success: keep the reservations
     return json({
       issues: Array.isArray(parsed.issues) ? parsed.issues.slice(0, 50) : [],
       suggestions: Array.isArray(parsed.suggestions) ? parsed.suggestions.slice(0, 5) : [],
@@ -125,6 +138,8 @@ Deno.serve(async (req) => {
     });
   } catch (e) {
     console.error("writing-check failed", e);
+    await giveBack();
+    if ((e as Error)?.name === "TimeoutError") return json({ error: "The AI took too long. Please try again." }, 504);
     return json({ error: "Something went wrong. Please try again." }, 500);
   }
 });

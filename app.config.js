@@ -1,47 +1,53 @@
 // Dynamic Expo config: layers AdMob IDs from the environment on top of app.json.
-// No real AdMob IDs are committed. Angel supplies them via env / EAS environment variables:
-//   ADMOB_ANDROID_APP_ID        e.g. ca-app-pub-XXXXXXXXXXXXXXXX~YYYYYYYYYY   (native app id)
-//   ADMOB_IOS_APP_ID            optional (iOS is not shipped yet)
-//   EXPO_PUBLIC_ADMOB_BANNER_ANDROID  e.g. ca-app-pub-XXXXXXXXXXXXXXXX/ZZZZZZZZZZ (banner unit id)
-// Behaviour when the app id is missing:
-//   - EAS "production" profile: the build FAILS (also when the banner unit id is missing/invalid) (we never ship Google's test ids).
-//   - any other build (dev/preview/local): Google's test *app* id is used only so the native SDK can
-//     initialise; the JS side still renders no ad outside __DEV__ without a real unit id (see src/lib/ads.ts).
-const GOOGLE_TEST_ANDROID_APP_ID = 'ca-app-pub-3940256099942544~3347511713';
-const GOOGLE_TEST_IOS_APP_ID = 'ca-app-pub-3940256099942544~1458002511';
+// No AdMob IDs (real or Google test) are committed. Supply them via env / EAS environment variables:
+//   ADMOB_ANDROID_APP_ID              ca-app-pub-XXXXXXXXXXXXXXXX~YYYYYYYYYY  (native app id)       REQUIRED
+//   EXPO_PUBLIC_ADMOB_BANNER_ANDROID  ca-app-pub-XXXXXXXXXXXXXXXX/ZZZZZZZZZZ  (banner unit id)      REQUIRED unless EXPO_PUBLIC_ADS_ENABLED=false
+//   ADMOB_IOS_APP_ID                  optional (iOS is not shipped; omitted from the plugin when unset)
+// There is NO test-id fallback for any build (EAS or local, release or preview): a missing/invalid id fails config
+// resolution. Local development only: set ADMOB_ALLOW_TEST_IDS=true (e.g. in .env.local) to use Google's test app id so
+// the native SDK can initialise. That opt-in is ignored (and rejected) on the EAS "production" profile, and the JS side
+// still shows test ads only under __DEV__ (see src/lib/ads.ts).
+const GOOGLE_TEST_PUBLISHER = 'ca-app-pub-3940256099942544';
+const GOOGLE_TEST_ANDROID_APP_ID = `${GOOGLE_TEST_PUBLISHER}~3347511713`;
 const APP_ID_RE = /^ca-app-pub-\d{16}~\d{10}$/;
+const UNIT_ID_RE = /^ca-app-pub-\d{16}\/\d{10}$/;
 
 module.exports = ({ config }) => {
-  const isProdProfile = process.env.EAS_BUILD_PROFILE === 'production';
-  const pick = (name, fallback) => {
-    const v = (process.env[name] || '').trim();
-    if (v && APP_ID_RE.test(v)) return v;
-    if (v) throw new Error(`${name} is set but is not a valid AdMob app id (ca-app-pub-XXXXXXXXXXXXXXXX~YYYYYYYYYY).`);
-    if (isProdProfile) throw new Error(`${name} is required for production builds. Refusing to ship Google test ad ids.`);
-    console.warn(`[app.config] ${name} not set; using Google TEST app id (non-production build only).`);
-    return fallback;
-  };
-  const androidAppId = pick('ADMOB_ANDROID_APP_ID', GOOGLE_TEST_ANDROID_APP_ID);
-  // iOS is not shipped; only enforce when explicitly provided or in production builds of iOS.
-  const iosAppId = process.env.ADMOB_IOS_APP_ID ? pick('ADMOB_IOS_APP_ID', GOOGLE_TEST_IOS_APP_ID) : GOOGLE_TEST_IOS_APP_ID;
+  const env = (n) => (process.env[n] || '').trim();
+  const allowTest = env('ADMOB_ALLOW_TEST_IDS') === 'true';
+  if (allowTest && process.env.EAS_BUILD_PROFILE === 'production') {
+    throw new Error('ADMOB_ALLOW_TEST_IDS must not be set for production builds.');
+  }
+  const adsEnabled = env('EXPO_PUBLIC_ADS_ENABLED') !== 'false';
 
-  // Production builds must also have a real banner unit id (unless ads are explicitly disabled): no test-ad fallback.
-  if (isProdProfile && process.env.EXPO_PUBLIC_ADS_ENABLED !== 'false') {
-    const unit = (process.env.EXPO_PUBLIC_ADMOB_BANNER_ANDROID || '').trim();
-    if (!/^ca-app-pub-\d{16}\/\d{10}$/.test(unit) || unit.startsWith('ca-app-pub-3940256099942544')) {
-      throw new Error('EXPO_PUBLIC_ADMOB_BANNER_ANDROID must be a real AdMob banner unit id for production builds (or set EXPO_PUBLIC_ADS_ENABLED=false).');
+  const appId = (name) => {
+    const v = env(name);
+    if (!v) return undefined;
+    if (!APP_ID_RE.test(v) || (v.startsWith(GOOGLE_TEST_PUBLISHER) && !allowTest)) {
+      throw new Error(`${name} is not a valid real AdMob app id (ca-app-pub-XXXXXXXXXXXXXXXX~YYYYYYYYYY).`);
     }
+    return v;
+  };
+
+  let androidAppId = appId('ADMOB_ANDROID_APP_ID');
+  if (!androidAppId) {
+    if (!allowTest) {
+      throw new Error('ADMOB_ANDROID_APP_ID is required (no test-id fallback). For local development only, set ADMOB_ALLOW_TEST_IDS=true.');
+    }
+    console.warn('[app.config] ADMOB_ALLOW_TEST_IDS=true: using Google TEST app id (local development only).');
+    androidAppId = GOOGLE_TEST_ANDROID_APP_ID;
+  }
+  const iosAppId = appId('ADMOB_IOS_APP_ID'); // optional; undefined => omitted (plugin only warns)
+
+  const unit = env('EXPO_PUBLIC_ADMOB_BANNER_ANDROID');
+  if (adsEnabled && !allowTest && (!UNIT_ID_RE.test(unit) || unit.startsWith(GOOGLE_TEST_PUBLISHER))) {
+    throw new Error('EXPO_PUBLIC_ADMOB_BANNER_ANDROID must be a real AdMob banner unit id (or set EXPO_PUBLIC_ADS_ENABLED=false). No test-ad fallback.');
   }
 
   const plugins = (config.plugins || []).map((p) =>
-    Array.isArray(p) && p[0] === 'react-native-google-mobile-ads' ? [p[0], { ...p[1], androidAppId, iosAppId }] : p,
+    Array.isArray(p) && p[0] === 'react-native-google-mobile-ads'
+      ? [p[0], { ...p[1], androidAppId, ...(iosAppId ? { iosAppId } : {}) }]
+      : p,
   );
-  return {
-    ...config,
-    plugins,
-    extra: {
-      ...config.extra,
-      admobBannerAndroid: (process.env.EXPO_PUBLIC_ADMOB_BANNER_ANDROID || '').trim(),
-    },
-  };
+  return { ...config, plugins, extra: { ...config.extra, admobBannerAndroid: unit } };
 };
