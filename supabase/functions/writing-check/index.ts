@@ -1,6 +1,7 @@
 // Supabase Edge Function: AI writing check (spelling, grammar, punctuation, suggestions).
 // Deploy with: supabase functions deploy writing-check   (verify_jwt stays ON: the Supabase gateway rejects requests without a valid
 // anon/user JWT; the app has no user accounts so it sends the anon key).
+// Required secret: IP_HASH_SECRET (random, >= 32 chars) keys the IP hashes; unset => 503. Optional: TRUSTED_PROXY_HOPS (default 1), see docs/SETUP.md.
 // Abuse protection: per-IP daily cap (IP_DAILY_LIMIT, default 30) + global daily cap (GLOBAL_DAILY_LIMIT, default 2000) + per-device free limit.
 // Provider-agnostic: any OpenAI-compatible /chat/completions API (Fireworks by default, OpenAI via AI_BASE_URL).
 // Secrets (supabase secrets set ...): AI_API_KEY (required), optional AI_BASE_URL, AI_MODEL, FREE_DAILY_LIMIT,
@@ -20,6 +21,7 @@ async function isProUser(rcUserId: string | null | undefined): Promise<boolean> 
   if (!key || !rcUserId || rcUserId.length > 128) return false; // rcUserId is client-supplied: only trusted via the RevenueCat lookup below
   try {
     const r = await fetch(`https://api.revenuecat.com/v1/subscribers/${encodeURIComponent(rcUserId)}`, {
+      signal: AbortSignal.timeout(5000), // fail safe: timeout/error => not Pro
       headers: { Authorization: `Bearer ${key}` },
     });
     if (!r.ok) return false;
@@ -28,22 +30,50 @@ async function isProUser(rcUserId: string | null | undefined): Promise<boolean> 
   } catch { return false; }
 }
 
+const IPV4_RE = /^(?:(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\.){3}(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)$/;
+function isIpv6(v: string): boolean {
+  if (v.length > 45 || !/^[0-9a-fA-F:.]+$/.test(v) || v.includes(":::")) return false;
+  const parts = v.split("::");
+  if (parts.length > 2) return false;
+  const groups = (x: string) => (x === "" ? [] : x.split(":"));
+  const all = [...groups(parts[0]), ...(parts.length === 2 ? groups(parts[1]) : [])];
+  let count = 0;
+  for (let i = 0; i < all.length; i++) {
+    const g = all[i];
+    if (i === all.length - 1 && g.includes(".")) { if (!IPV4_RE.test(g)) return false; count += 2; continue; } // embedded IPv4 tail
+    if (!/^[0-9a-fA-F]{1,4}$/.test(g)) return false;
+    count++;
+  }
+  return parts.length === 2 ? count < 8 : count === 8;
+}
+/** Returns a normalised IP string if `v` is a syntactically valid IPv4/IPv6 address, else null. */
+function validIp(v: string | null | undefined): string | null {
+  const t = (v ?? "").trim();
+  if (IPV4_RE.test(t)) return t;
+  return isIpv6(t) ? t.toLowerCase() : null;
+}
+
 /**
  * Caller IP from headers set by Supabase's proxy. Prefers cf-connecting-ip (set by the CDN, not client-controllable);
  * otherwise the last *trusted* x-forwarded-for hop: entries before it can be spoofed by the client, so we take
  * the entry TRUSTED_PROXY_HOPS from the right (default 1 = the address the edge proxy itself appended).
- * Returns null when no IP can be determined (the request is then rejected; there is no shared "unknown" bucket).
+ * Every candidate must be a syntactically valid IPv4/IPv6 address, otherwise it is ignored.
+ * Returns null when no valid IP can be determined (the request is then refused with 503; there is no shared bucket).
+ * Post-deploy check: see docs/SETUP.md ("Verify the IP headers").
  */
 function clientIp(req: Request): string | null {
-  const cf = req.headers.get("cf-connecting-ip")?.trim();
+  const cf = validIp(req.headers.get("cf-connecting-ip"));
   if (cf) return cf;
   const hops = (req.headers.get("x-forwarded-for") ?? "").split(",").map((x) => x.trim()).filter(Boolean);
-  const n = Math.max(1, Number(Deno.env.get("TRUSTED_PROXY_HOPS") ?? "1") || 1);
-  return hops.length >= n ? hops[hops.length - n] : null;
+  const n = Math.max(1, Math.floor(Number(Deno.env.get("TRUSTED_PROXY_HOPS") ?? "1")) || 1);
+  return hops.length >= n ? validIp(hops[hops.length - n]) : null;
 }
 
-async function sha256Hex(v: string): Promise<string> {
-  const d = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(v));
+/** HMAC-SHA256(ip, secret) as hex: keyed so stored keys can't be reversed by brute-forcing the IPv4 space. */
+async function hmacIpKey(ip: string, secret: string): Promise<string> {
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey("raw", enc.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const d = await crypto.subtle.sign("HMAC", key, enc.encode(ip));
   return Array.from(new Uint8Array(d), (b) => b.toString(16).padStart(2, "0")).join("");
 }
 
@@ -73,9 +103,16 @@ Deno.serve(async (req) => {
     if (!/^[\w-]{8,64}$/.test(deviceId)) return json({ error: "Missing device id" }, 400);
 
     const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+    const ipSecret = Deno.env.get("IP_HASH_SECRET");
+    if (!ipSecret) { console.error("IP_HASH_SECRET is not set; refusing requests (fail closed)"); return json({ error: "service_unavailable" }, 503); }
     const ip = clientIp(req);
-    if (!ip) return json({ error: "Could not determine client address" }, 400);
-    const ipKey = (await sha256Hex(ip)).slice(0, 32);
+    if (!ip) {
+      console.error("no valid client IP in cf-connecting-ip / x-forwarded-for; check TRUSTED_PROXY_HOPS", {
+        cf: req.headers.get("cf-connecting-ip") ? "present" : "absent", xffHops: (req.headers.get("x-forwarded-for") ?? "").split(",").length,
+      });
+      return json({ error: "service_unavailable" }, 503);
+    }
+    const ipKey = (await hmacIpKey(ip, ipSecret)).slice(0, 32);
     giveBack = async () => {
       const dev = deviceReserved, quota = quotaConsumed;
       deviceReserved = quotaConsumed = false; // idempotent

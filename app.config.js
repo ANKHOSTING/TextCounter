@@ -7,6 +7,8 @@
 // resolution. Local development only: set ADMOB_ALLOW_TEST_IDS=true (e.g. in .env.local) to use Google's test app id so
 // the native SDK can initialise. That opt-in is ignored (and rejected) on the EAS "production" profile, and the JS side
 // still shows test ads only under __DEV__ (see src/lib/ads.ts).
+// The opt-in is also rejected when NODE_ENV=production. Preview builds (release APKs) and EAS Update publishes resolve this
+// same config, so they need the REAL ids set as EAS environment variables for that environment; they must not use the opt-in.
 const GOOGLE_TEST_PUBLISHER = 'ca-app-pub-3940256099942544';
 const GOOGLE_TEST_ANDROID_APP_ID = `${GOOGLE_TEST_PUBLISHER}~3347511713`;
 const APP_ID_RE = /^ca-app-pub-\d{16}~\d{10}$/;
@@ -15,8 +17,8 @@ const UNIT_ID_RE = /^ca-app-pub-\d{16}\/\d{10}$/;
 module.exports = ({ config }) => {
   const env = (n) => (process.env[n] || '').trim();
   const allowTest = env('ADMOB_ALLOW_TEST_IDS') === 'true';
-  if (allowTest && process.env.EAS_BUILD_PROFILE === 'production') {
-    throw new Error('ADMOB_ALLOW_TEST_IDS must not be set for production builds.');
+  if (allowTest && (process.env.EAS_BUILD_PROFILE === 'production' || process.env.NODE_ENV === 'production')) {
+    throw new Error('ADMOB_ALLOW_TEST_IDS must not be set when NODE_ENV=production or on the EAS production profile.');
   }
   const adsEnabled = env('EXPO_PUBLIC_ADS_ENABLED') !== 'false';
 
