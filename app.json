@@ -22,7 +22,7 @@
     "plugins": [
       "expo-router",
       "expo-status-bar",
-      ["expo-build-properties", {}],
+      ["expo-build-properties", { "android": { "compileSdkVersion": 37, "targetSdkVersion": 36 } }],
       ["react-native-google-mobile-ads", {
         "androidAppId": "ca-app-pub-3940256099942544~3347511713",
         "iosAppId": "ca-app-pub-3940256099942544~1458002511"
