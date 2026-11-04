@@ -6,7 +6,7 @@ import { usePro } from '@/lib/pro';
 import { aiConfigured } from '@/lib/ai';
 import { Button, Card, colors, s } from '@/components/ui';
 
-const PRIVACY_URL = process.env.EXPO_PUBLIC_PRIVACY_POLICY_URL ?? 'https://github.com/ANKHOSTING/TextCounter/blob/main/PRIVACY_POLICY.md';
+const PRIVACY_URL = process.env.EXPO_PUBLIC_PRIVACY_POLICY_URL ?? 'https://ankhosting.github.io/textcraft/privacy.html';
 
 export default function Settings() {
   const router = useRouter();
