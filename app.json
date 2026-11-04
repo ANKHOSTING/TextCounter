@@ -9,7 +9,7 @@
     "userInterfaceStyle": "light",
     "ios": { "bundleIdentifier": "com.textcounter.app", "supportsTablet": true },
     "android": {
-      "package": "com.textcounter.app",
+      "package": "com.ankhosting.textcraft",
       "versionCode": 10,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",

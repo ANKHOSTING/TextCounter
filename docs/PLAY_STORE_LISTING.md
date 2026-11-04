@@ -1,6 +1,6 @@
 # Google Play listing — TextCraft: Word Counter
 
-- **Package:** `com.textcounter.app` (existing Play Console app, internal testing)
+- **Package:** `com.ankhosting.textcraft` (new Play Console app; replaces `com.textcounter.app`)
 - **App name (30 max):** TextCraft: Word Counter
 - **Category:** Productivity · **Tags:** Writing, Productivity tools
 - **Contains ads:** Yes · **In-app purchases:** Yes (TextCraft Pro)

@@ -7,10 +7,10 @@ The app runs with **zero configuration**: all counting, analysis and drafts work
 2. `npx eas-cli init` — replaces `REPLACE_WITH_EAS_PROJECT_ID` in `app.json`.
 3. Add env values for builds: `npx eas-cli env:create` (or the expo.dev dashboard) for each `EXPO_PUBLIC_*` in `.env.example`.
 4. Production AAB: `npx eas-cli build -p android --profile production`.
-5. Upload the `.aab` to Play Console → TextCounter → Internal testing (or `eas submit -p android` with a Play service-account JSON at `./play-service-account.json`, which is git-ignored).
+5. Upload the `.aab` to Play Console → TextCraft → Internal testing (or `eas submit -p android` with a Play service-account JSON at `./play-service-account.json`, which is git-ignored).
 
 ### Package and versionCode
-- `android.package` is **`com.textcounter.app`** to match the existing Play Console app. Do not change it.
+- `android.package` is **`com.ankhosting.textcraft`** (a new Play Console app; the old `com.textcounter.app` listing is abandoned). Do not change it once published.
 - `android.versionCode` is set to **10** so it exceeds earlier uploads. If Play says "version code already used", raise it in `app.json` (e.g. 11, 20) and rebuild. Bump it on every upload.
 - If Play rejects the AAB for a **signing key mismatch**, the earlier upload was signed with a different key. In Play Console → App integrity, either let EAS use the existing upload key (`eas credentials` → upload your keystore) or request an upload-key reset.
 
@@ -54,13 +54,13 @@ The free limit is enforced server-side per random device ID. A determined user c
 
 ## 3. TextCraft Pro (RevenueCat + Google Play Billing)
 1. Play Console → Monetize → Subscriptions: create e.g. `textcraft_pro_monthly` and `textcraft_pro_yearly`. (Requires an uploaded build with the BILLING permission, which this app has.)
-2. RevenueCat (https://app.revenuecat.com): new project → Android app `com.textcounter.app` → connect a Play service-account.
+2. RevenueCat (https://app.revenuecat.com): new project → Android app `com.ankhosting.textcraft` → connect a Play service-account.
 3. Create entitlement **`pro`**, attach both products, and add them to the **current** offering.
 4. Copy the public Android SDK key (`goog_...`) to `EXPO_PUBLIC_REVENUECAT_ANDROID_KEY`.
 5. Optional but recommended: put a RevenueCat **secret** API key in the Supabase secret `REVENUECAT_SECRET_KEY` so the server grants Pro users unlimited AI checks. Without it, Pro still removes ads but the server applies the free limit.
 
 ## 4. Ads (AdMob)
-1. Create an AdMob app for `com.textcounter.app` and a banner ad unit.
+1. Create an AdMob app for `com.ankhosting.textcraft` and a banner ad unit.
 2. Set `ADMOB_ANDROID_APP_ID` (`ca-app-pub-XXXX~YYYY`) as an env / EAS environment variable; `app.config.js` injects it into the AdMob plugin. Config resolution (any EAS profile or local build) fails if it is missing; there is no test-id fallback. For local dev, set `ADMOB_ALLOW_TEST_IDS=true` (already set in the EAS `development` and `preview` profiles, so preview builds use Google's test app id and show no ads). The opt-in is honoured only for those profiles or local non-EAS runs, and is rejected for `production` and anywhere else. `plugins/with-no-test-admob.js` fails any release Gradle build whose merged manifest contains Google's test app id, except when `EAS_BUILD_PROFILE` is `development` or `preview`; **local release builds (e.g. `expo run:android --variant release`) always need the real IDs**. **Production builds and `eas update` need the real IDs**: they are set in the `production` profile of `eas.json` (public IDs, not secrets); for `eas update`, add `ADMOB_ANDROID_APP_ID` and `EXPO_PUBLIC_ADMOB_BANNER_ANDROID` as EAS environment variables and run it with `--environment` set. Switch `preview` to real IDs only if you want to test live ad units.
 3. Set `EXPO_PUBLIC_ADMOB_BANNER_ANDROID` (`ca-app-pub-XXXX/ZZZZ`) to your banner unit ID. If empty, release builds show **no** ad; Google test ads are used only in `__DEV__`.
 4. Add `app-ads.txt` on your developer website if you list one in Play.
