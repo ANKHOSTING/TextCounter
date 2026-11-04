@@ -4,7 +4,7 @@ AI-powered word counter and writing companion for Android, built with Expo (Reac
 It merges the original **TextCounter** (word counter with spelling/punctuation check, letter counts, keyword density)
 and **TextCraft-Pro** (word counts, character analysis, writing insights) ideas into one app.
 
-> Previously a Base44 project. This repo is now the Expo app that ships to Google Play as `com.textcounter.app`.
+> Previously a Base44 project. This repo is now the Expo app that ships to Google Play as `com.ankhosting.textcraft`.
 
 ## Features
 Works fully **offline, no account**:
