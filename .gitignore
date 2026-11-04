@@ -96,3 +96,8 @@ ios/
 web-build/
 expo-env.d.ts
 play-service-account.json
+
+# signing material (chore/infra-audit-2026-11)
+*.jks
+*.keystore
+keystore.properties
