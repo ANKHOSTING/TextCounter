@@ -145,8 +145,8 @@ Deno.serve(async (req) => {
     giveBack = async () => {
       const dev = deviceReserved, quota = quotaConsumed;
       deviceReserved = quotaConsumed = false; // idempotent
-      if (dev) await admin.rpc("refund_ai_usage", { p_device: deviceId }).then(() => {}, () => {});
-      if (quota) await admin.rpc("refund_ai_quota", { p_ip_key: ipKey }).then(() => {}, () => {});
+      if (dev) await admin.rpc("refund_ai_usage", { p_device: deviceId }).then(({ error }) => { if (error) console.error("refund_ai_usage failed", error.message); }, (e) => console.error("refund_ai_usage threw", (e as Error)?.message));
+      if (quota) await admin.rpc("refund_ai_quota", { p_ip_key: ipKey }).then(({ error }) => { if (error) console.error("refund_ai_quota failed", error.message); }, (e) => console.error("refund_ai_quota threw", (e as Error)?.message));
     };
 
     // 1) Pro status + per-device free limit first (atomic reserve), so requests already over the free limit
@@ -187,7 +187,8 @@ Deno.serve(async (req) => {
         messages: [{ role: "system", content: SYSTEM }, { role: "user", content: text.slice(0, 6000) }],
       }),
     });
-    if (!resp.ok) { console.error("AI provider", resp.status, await resp.text()); await giveBack(); return json({ error: "AI provider error" }, 502); }
+    // Provider response body is deliberately not logged: it can echo user text.
+    if (!resp.ok) { console.error("AI provider", resp.status); await giveBack(); return json({ error: "AI provider error" }, 502); }
     const data = await resp.json();
     let parsed: any = {};
     const raw: string = data.choices?.[0]?.message?.content ?? "{}";
