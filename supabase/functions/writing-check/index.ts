@@ -187,8 +187,7 @@ Deno.serve(async (req) => {
         messages: [{ role: "system", content: SYSTEM }, { role: "user", content: text.slice(0, 6000) }],
       }),
     });
-    // Provider response body is deliberately not logged: it can echo user text.
-    if (!resp.ok) { console.error("AI provider", resp.status); await giveBack(); return json({ error: "AI provider error" }, 502); }
+    if (!resp.ok) { console.error("AI provider", resp.status, await resp.text()); await giveBack(); return json({ error: "AI provider error" }, 502); }
     const data = await resp.json();
     let parsed: any = {};
     const raw: string = data.choices?.[0]?.message?.content ?? "{}";
